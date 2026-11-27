@@ -5,6 +5,9 @@
 import "./src/env.js";
 
 /** @type {import("next").NextConfig} */
-const config = {};
+const config = {
+	// Keep Next.js from appending its own block to our hand-written AGENTS.md.
+	agentRules: false,
+};
 
 export default config;
