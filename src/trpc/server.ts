@@ -24,7 +24,9 @@ const createContext = cache(async () => {
 const getQueryClient = cache(createQueryClient);
 const caller = createCaller(createContext);
 
+// While `appRouter` has no routers, tRPC cannot tell `AppRouter` apart from `AnyRouter` and rejects
+// the caller ("Generic parameter missing"). Drop the cast once the first router is registered.
 export const { trpc: api, HydrateClient } = createHydrationHelpers<AppRouter>(
-	caller,
+	caller as never,
 	getQueryClient,
 );
