@@ -9,6 +9,7 @@ import { type UserId, userIdSchema } from "~/server/auth/validation";
 
 import { accounts, users } from "~/server/db/schema";
 
+import { assertTestDatabase } from "./test/assert-test-database";
 import { createUserData } from "./user-data";
 
 /**
@@ -32,6 +33,7 @@ if (!new URL(url).pathname.endsWith("_test")) {
 }
 
 const client = postgres(url, { max: 1, onnotice: () => {} });
+await assertTestDatabase(client);
 const testDb = drizzle(client);
 
 const forUser = createUserData(testDb, {
@@ -81,6 +83,17 @@ describe("forUser: insert", () => {
 
 		const stored = await rowsInDb(eq(ownedItems.id, row?.id ?? -1));
 		expect(stored.map((r) => r.userId)).toEqual([userA]);
+	});
+
+	it("writes the session's userId for every row of an array", async () => {
+		const rows = await forUser(userA).insert(ownedItems, [
+			// @ts-expect-error: userId is not accepted from the caller.
+			{ name: "A1", userId: userB },
+			{ name: "A2" },
+		]);
+		expect(rows.map((r) => r.userId)).toEqual([userA, userA]);
+
+		expect(await rowsInDb(eq(ownedItems.userId, userB))).toEqual([]);
 	});
 });
 
@@ -214,6 +227,34 @@ describe("forUser: guards", () => {
 		).rejects.toThrow(/not registered/);
 	});
 
+	it("update and delete without a where condition throw", async () => {
+		const [row] = await forUser(userA).insert(ownedItems, { name: "A" });
+		await expect(
+			// @ts-expect-error: where is required.
+			forUser(userA).update(ownedItems, { name: "all" }),
+		).rejects.toThrow(/requires a where/);
+		await expect(
+			// @ts-expect-error: where is required.
+			forUser(userA).delete(ownedItems),
+		).rejects.toThrow(/requires a where/);
+
+		expect(await rowsInDb(eq(ownedItems.id, row?.id ?? -1))).toEqual([
+			{ id: row?.id, userId: userA, name: "A" },
+		]);
+	});
+
+	it("update with no defined column values throws", async () => {
+		const [row] = await forUser(userA).insert(ownedItems, { name: "A" });
+		const where = eq(ownedItems.id, row?.id ?? -1);
+		await expect(
+			forUser(userA).update(ownedItems, { name: undefined }, where),
+		).rejects.toThrow(/no columns to change/);
+		await expect(
+			// @ts-expect-error: notAColumn is not a column of the table.
+			forUser(userA).update(ownedItems, { notAColumn: "x" }, where),
+		).rejects.toThrow(/no columns to change/);
+	});
+
 	it("rejects an empty userId", () => {
 		expect(userIdSchema.safeParse("").success).toBe(false);
 		expect(userIdSchema.safeParse("   ").success).toBe(false);
@@ -222,6 +263,15 @@ describe("forUser: guards", () => {
 		expect(() => forUser("" as UserId)).toThrow(/nie może być pusty/);
 		expect(() => forUser("   " as UserId)).toThrow(ZodError);
 		expect(() => forUser("   " as UserId)).toThrow(/nie może być pusty/);
+	});
+
+	it("rejects a userId with spaces at the edges or over 255 characters, without trimming", () => {
+		expect(userIdSchema.safeParse(" abc").success).toBe(false);
+		expect(userIdSchema.safeParse("abc ").success).toBe(false);
+		expect(() => forUser(" abc " as UserId)).toThrow(/spacją/);
+		expect(userIdSchema.safeParse("a".repeat(256)).success).toBe(false);
+		expect(userIdSchema.parse("a".repeat(255))).toBe("a".repeat(255));
+		expect(userIdSchema.parse(userA)).toBe(userA);
 	});
 
 	it("accepts only a branded UserId, not a plain string", () => {

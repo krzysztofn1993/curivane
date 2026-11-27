@@ -120,8 +120,8 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
  *
  * If you want a query or mutation to ONLY be accessible to logged in users, use this. It verifies
  * the session is valid and guarantees `ctx.session.user` is not null and that `ctx.session.user.id`
- * passes `userIdSchema` (non-empty after trimming), so per-user queries never run with an empty
- * `userId`.
+ * passes `userIdSchema` (not blank, no spaces at the edges, at most 255 characters), so per-user
+ * queries never run with an empty `userId`.
  *
  * It also provides `ctx.userData = forUser(<parsed UserId>)`, the only way for a procedure to reach
  * user-owned tables (see `src/server/data/`).

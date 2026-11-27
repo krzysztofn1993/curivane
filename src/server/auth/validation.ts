@@ -34,11 +34,20 @@ export const registerSchema = z.object({
  * (`forUser` in `src/server/data/`) accept only an id that went through this schema, not any
  * `string`. Lives here because the id comes from auth and this file imports only zod, so
  * `src/server/api/`, `src/server/data/` and tests can use it without pulling in next-auth or db.
+ *
+ * It only rejects, never transforms: an id with spaces at the edges is refused, not trimmed into a
+ * different id. Max 255 characters, like `users.id` (`varchar(255)`).
  */
 export const userIdSchema = z
 	.string()
-	.trim()
-	.min(1, { error: "Identyfikator użytkownika nie może być pusty." })
+	.max(255, { error: "Identyfikator użytkownika jest za długi." })
+	.refine((id) => id.trim().length > 0, {
+		error: "Identyfikator użytkownika nie może być pusty.",
+	})
+	.refine((id) => id.trim() === id, {
+		error:
+			"Identyfikator użytkownika nie może zaczynać się ani kończyć spacją.",
+	})
 	.brand<"UserId">();
 
 export type UserId = z.infer<typeof userIdSchema>;

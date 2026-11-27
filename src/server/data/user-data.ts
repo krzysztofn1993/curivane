@@ -1,4 +1,4 @@
-import { and, eq, type SQL, sql } from "drizzle-orm";
+import { and, eq, getTableColumns, type SQL, sql } from "drizzle-orm";
 import type {
 	AnyPgColumn,
 	PgDatabase,
@@ -147,8 +147,18 @@ export function createUserData(
 			async update(table, set, where) {
 				assertOwned(table);
 				assertWhere(where, "update");
-				// Ownership cannot be transferred: userId is dropped from the changes.
-				const { userId: _ignored, ...changes } = set as Record<string, unknown>;
+				// Ownership cannot be transferred: userId is dropped from the changes. Only the table's
+				// columns with a defined value count, so `{ name: undefined }` or a key that is not a
+				// column gives this error instead of a Drizzle or SQL error.
+				const columns = getTableColumns(table as PgTable);
+				const changes = Object.fromEntries(
+					Object.entries(set as Record<string, unknown>).filter(
+						([key, value]) =>
+							key !== "userId" &&
+							Object.hasOwn(columns, key) &&
+							value !== undefined,
+					),
+				);
 				if (Object.keys(changes).length === 0) {
 					throw new Error("User data: update() has no columns to change.");
 				}
