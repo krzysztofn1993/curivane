@@ -1,4 +1,4 @@
-import { and, eq, type SQL } from "drizzle-orm";
+import { and, eq, type SQL, sql } from "drizzle-orm";
 import type {
 	AnyPgColumn,
 	PgDatabase,
@@ -98,8 +98,10 @@ export function createUserData(
 	return (input) => {
 		const userId = userIdSchema.parse(input);
 
+		// The caller's condition goes in parentheses: `and()` does not wrap its parts, so a raw
+		// sql`a or b` would otherwise become `userId = $1 and a or b` and match other users' rows.
 		const owner = (table: OwnedTable, where?: SQL) =>
-			and(eq(table.userId, userId), where);
+			and(eq(table.userId, userId), where && sql`(${where})`);
 
 		const findMany = async <T extends OwnedTable>(
 			table: T,

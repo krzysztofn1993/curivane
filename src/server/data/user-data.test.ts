@@ -1,4 +1,4 @@
-import { eq, inArray, type SQL } from "drizzle-orm";
+import { eq, inArray, type SQL, sql } from "drizzle-orm";
 import { integer, pgTable, varchar } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -139,6 +139,36 @@ describe("forUser: user B cannot reach user A's record", () => {
 			eq(ownedItems.id, aItemId),
 		);
 		expect(deleted).toEqual([]);
+
+		const stored = await rowsInDb(eq(ownedItems.id, aItemId));
+		expect(stored).toEqual([{ id: aItemId, userId: userA, name: "A" }]);
+	});
+
+	// A raw `or` must not widen the owner condition: without parentheses B's query would be
+	// `userId = B and id = B or id = A`, which also matches A's row.
+	const aOrB = () =>
+		sql`${ownedItems.id} = ${bItemId} or ${ownedItems.id} = ${aItemId}`;
+
+	it("findMany with a raw sql `or` returns only the caller's rows", async () => {
+		const rows = await forUser(userB).findMany(ownedItems, { where: aOrB() });
+		expect(rows.map((r) => r.id)).toEqual([bItemId]);
+	});
+
+	it("update with a raw sql `or` changes only the caller's rows", async () => {
+		const updated = await forUser(userB).update(
+			ownedItems,
+			{ name: "hacked" },
+			aOrB(),
+		);
+		expect(updated.map((r) => r.id)).toEqual([bItemId]);
+
+		const [stored] = await rowsInDb(eq(ownedItems.id, aItemId));
+		expect(stored).toEqual({ id: aItemId, userId: userA, name: "A" });
+	});
+
+	it("delete with a raw sql `or` removes only the caller's rows", async () => {
+		const deleted = await forUser(userB).delete(ownedItems, aOrB());
+		expect(deleted.map((r) => r.id)).toEqual([bItemId]);
 
 		const stored = await rowsInDb(eq(ownedItems.id, aItemId));
 		expect(stored).toEqual([{ id: aItemId, userId: userA, name: "A" }]);

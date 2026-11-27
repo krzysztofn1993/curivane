@@ -35,7 +35,13 @@
 					"options": {
 						"patterns": [
 							{
-								"group": ["**/db", "**/db/index", "**/db/index.*"],
+								"group": [
+									"**/db",
+									"**/db/",
+									"**/db/.",
+									"**/db/index",
+									"**/db/index.*"
+								],
 								"message": "Nie importuj instancji db poza modułem danych. Użyj ~/server/data (forUser), patrz AGENTS.md."
 							}
 						]
