@@ -12,14 +12,19 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 
 import { auth } from "~/server/auth";
-import { db } from "~/server/db";
+import { forUser } from "~/server/data";
 
 /**
  * 1. CONTEXT
  *
  * This section defines the "contexts" that are available in the backend API.
  *
- * These allow you to access things when processing a request, like the database, the session, etc.
+ * These allow you to access things when processing a request, like the session.
+ *
+ * There is deliberately no `db` here: procedures never get raw database access. Per-user data is
+ * read and written only through `ctx.userData` in `protectedProcedure`, built by `forUser` from
+ * `src/server/data/`, which scopes every query to the session's user. Importing `~/server/db`
+ * outside the allowed places is a lint error (`noRestrictedImports` in `biome.jsonc`).
  *
  * This helper generates the "internals" for a tRPC context. The API handler and RSC clients each
  * wrap this and provides the required context.
@@ -30,7 +35,6 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
 	const session = await auth();
 
 	return {
-		db,
 		session,
 		...opts,
 	};
@@ -117,6 +121,9 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
  * the session is valid and guarantees `ctx.session.user` is not null and `ctx.session.user.id` is a
  * non-empty string, so per-user queries never run with an empty `userId`.
  *
+ * It also provides `ctx.userData = forUser(ctx.session.user.id)`, the only way for a procedure to
+ * reach user-owned tables (see `src/server/data/`).
+ *
  * @see https://trpc.io/docs/procedures
  */
 export const protectedProcedure = t.procedure
@@ -129,6 +136,7 @@ export const protectedProcedure = t.procedure
 			ctx: {
 				// infers the `session` as non-nullable
 				session: { ...ctx.session, user: ctx.session.user },
+				userData: forUser(ctx.session.user.id),
 			},
 		});
 	});
