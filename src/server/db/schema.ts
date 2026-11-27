@@ -10,27 +10,6 @@ import type { AdapterAccount } from "next-auth/adapters";
  */
 export const createTable = pgTableCreator((name) => `curivane_${name}`);
 
-export const posts = createTable(
-	"post",
-	(d) => ({
-		id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
-		name: d.varchar({ length: 256 }),
-		createdById: d
-			.varchar({ length: 255 })
-			.notNull()
-			.references(() => users.id),
-		createdAt: d
-			.timestamp({ withTimezone: true })
-			.$defaultFn(() => /* @__PURE__ */ new Date())
-			.notNull(),
-		updatedAt: d.timestamp({ withTimezone: true }).$onUpdate(() => new Date()),
-	}),
-	(t) => [
-		index("created_by_idx").on(t.createdById),
-		index("name_idx").on(t.name),
-	],
-);
-
 export const users = createTable("user", (d) => ({
 	id: d
 		.varchar({ length: 255 })
@@ -59,7 +38,7 @@ export const accounts = createTable(
 		userId: d
 			.varchar({ length: 255 })
 			.notNull()
-			.references(() => users.id),
+			.references(() => users.id, { onDelete: "cascade" }),
 		type: d.varchar({ length: 255 }).$type<AdapterAccount["type"]>().notNull(),
 		provider: d.varchar({ length: 255 }).notNull(),
 		providerAccountId: d.varchar({ length: 255 }).notNull(),
@@ -88,7 +67,7 @@ export const sessions = createTable(
 		userId: d
 			.varchar({ length: 255 })
 			.notNull()
-			.references(() => users.id),
+			.references(() => users.id, { onDelete: "cascade" }),
 		expires: d.timestamp({ mode: "date", withTimezone: true }).notNull(),
 	}),
 	(t) => [index("t_user_id_idx").on(t.userId)],

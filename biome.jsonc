@@ -28,6 +28,26 @@
 		"enabled": true,
 		"rules": {
 			"preset": "recommended",
+			"style": {
+				// Raw `db` stays behind src/server/data (forUser), which scopes queries to the owner.
+				"noRestrictedImports": {
+					"level": "error",
+					"options": {
+						"patterns": [
+							{
+								"group": [
+									"**/db",
+									"**/db/",
+									"**/db/.",
+									"**/db/index",
+									"**/db/index.*"
+								],
+								"message": "Nie importuj instancji db poza modułem danych. Użyj ~/server/data (forUser), patrz AGENTS.md."
+							}
+						]
+					}
+				}
+			},
 			"nursery": {
 				"useTailwindSortedClasses": {
 					"level": "warn",
@@ -36,6 +56,24 @@
 			}
 		}
 	},
+	"overrides": [
+		{
+			// The only places allowed to import the db instance directly.
+			"includes": [
+				"src/server/db/**",
+				"src/server/auth/**",
+				"src/app/(auth)/actions.ts",
+				"src/server/data/**"
+			],
+			"linter": {
+				"rules": {
+					"style": {
+						"noRestrictedImports": "off"
+					}
+				}
+			}
+		}
+	],
 	"html": {
 		"formatter": {
 			"enabled": true
