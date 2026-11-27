@@ -3,6 +3,9 @@ import { integer, pgTable, varchar } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { ZodError } from "zod";
+
+import { type UserId, userIdSchema } from "~/server/auth/validation";
 
 import { accounts, users } from "~/server/db/schema";
 
@@ -43,13 +46,13 @@ async function createUser() {
 	const id = crypto.randomUUID();
 	await testDb.insert(users).values({ id, email: `${id}@example.test` });
 	createdUserIds.push(id);
-	return id;
+	return userIdSchema.parse(id);
 }
 
 const rowsInDb = (where: SQL) => testDb.select().from(ownedItems).where(where);
 
-let userA: string;
-let userB: string;
+let userA: UserId;
+let userB: UserId;
 
 beforeEach(async () => {
 	userA = await createUser();
@@ -182,8 +185,19 @@ describe("forUser: guards", () => {
 	});
 
 	it("rejects an empty userId", () => {
-		expect(() => forUser("")).toThrow(/non-empty/);
-		expect(() => forUser("   ")).toThrow(/non-empty/);
+		expect(userIdSchema.safeParse("").success).toBe(false);
+		expect(userIdSchema.safeParse("   ").success).toBe(false);
+		// A cast gets past the brand at compile time; the runtime parse still rejects the id.
+		expect(() => forUser("" as UserId)).toThrow(ZodError);
+		expect(() => forUser("" as UserId)).toThrow(/nie może być pusty/);
+		expect(() => forUser("   " as UserId)).toThrow(ZodError);
+		expect(() => forUser("   " as UserId)).toThrow(/nie może być pusty/);
+	});
+
+	it("accepts only a branded UserId, not a plain string", () => {
+		// @ts-expect-error: a plain string is not a UserId; parse it with userIdSchema first.
+		forUser(String(userA));
+		expect(() => forUser(userA)).not.toThrow();
 	});
 });
 

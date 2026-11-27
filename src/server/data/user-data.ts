@@ -6,6 +6,8 @@ import type {
 	PgTable,
 } from "drizzle-orm/pg-core";
 
+import { type UserId, userIdSchema } from "~/server/auth/validation";
+
 import type { OwnedTable, UserDataRegistry } from "./registry";
 
 /**
@@ -66,11 +68,15 @@ export type UserData = {
 
 /**
  * Builds `forUser(userId)`. The only way to reach `userOwned` tables; see `registry.ts`.
+ *
+ * `userId` is a branded `UserId` (parse it with `userIdSchema` from `~/server/auth/validation`), so a
+ * plain `string` does not type-check. It is parsed again at runtime, so an empty or whitespace-only
+ * id smuggled in with a cast still throws a `ZodError`.
  */
 export function createUserData(
 	db: AnyPgDatabase,
 	registry: UserDataRegistry,
-): (userId: string) => UserData {
+): (userId: UserId) => UserData {
 	const ownedTables = new Set<PgTable>(
 		registry.userOwned.map((entry) => entry.table),
 	);
@@ -89,10 +95,8 @@ export function createUserData(
 		}
 	}
 
-	return (userId) => {
-		if (typeof userId !== "string" || userId.trim() === "") {
-			throw new Error("User data: userId must be a non-empty string.");
-		}
+	return (input) => {
+		const userId = userIdSchema.parse(input);
 
 		const owner = (table: OwnedTable, where?: SQL) =>
 			and(eq(table.userId, userId), where);

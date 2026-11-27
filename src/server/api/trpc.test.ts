@@ -1,6 +1,8 @@
 import type { Session } from "next-auth";
 import { describe, expect, it, vi } from "vitest";
 
+import { userIdSchema } from "~/server/auth/validation";
+
 // trpc.ts imports ~/server/auth, which pulls in next-auth; the context is built by hand below.
 vi.mock("~/server/auth", () => ({ auth: vi.fn() }));
 
@@ -38,8 +40,15 @@ describe("protectedProcedure", () => {
 		});
 	});
 
+	it("rejects a whitespace-only user id", async () => {
+		await expect(callWith(sessionFor("   "))).rejects.toMatchObject({
+			code: "UNAUTHORIZED",
+		});
+	});
+
 	it("gives ctx.userData and no ctx.db for a valid session", async () => {
-		await expect(callWith(sessionFor("user-1"))).resolves.toEqual({
+		const userId = userIdSchema.parse("user-1");
+		await expect(callWith(sessionFor(userId))).resolves.toEqual({
 			userId: "user-1",
 			hasUserData: true,
 			hasDb: false,

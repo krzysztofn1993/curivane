@@ -40,6 +40,7 @@ Curivane is a solo, self-hosted speed-reading and memory-training web app: a cre
 - E-mails are stored lower-cased and unique.
 - There is no rate limiting, password reset or e-mail verification yet.
 - Read and write user data only through `ctx.userData` (`forUser` from `~/server/data`) in `protectedProcedure`; it adds the owner condition to every query. The tRPC context has no `db`.
+- Validate all input and identifiers with zod (tRPC `.input()`, server actions, ids from the session). Brand ids with zod `.brand()` (e.g. `UserId` from `userIdSchema` in `validation.ts`) and accept the branded type, not `string`, in data functions.
 - Import `~/server/db` only in `src/server/db/`, `src/server/auth/`, `src/app/(auth)/actions.ts` and `src/server/data/` (Biome `noRestrictedImports`).
 - Every new procedure with user data gets a case in the isolation test @src/server/data/user-data.test.ts.
 

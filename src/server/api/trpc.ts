@@ -12,6 +12,7 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 
 import { auth } from "~/server/auth";
+import { userIdSchema } from "~/server/auth/validation";
 import { forUser } from "~/server/data";
 
 /**
@@ -118,25 +119,27 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
  * Protected (authenticated) procedure
  *
  * If you want a query or mutation to ONLY be accessible to logged in users, use this. It verifies
- * the session is valid and guarantees `ctx.session.user` is not null and `ctx.session.user.id` is a
- * non-empty string, so per-user queries never run with an empty `userId`.
+ * the session is valid and guarantees `ctx.session.user` is not null and that `ctx.session.user.id`
+ * passes `userIdSchema` (non-empty after trimming), so per-user queries never run with an empty
+ * `userId`.
  *
- * It also provides `ctx.userData = forUser(ctx.session.user.id)`, the only way for a procedure to
- * reach user-owned tables (see `src/server/data/`).
+ * It also provides `ctx.userData = forUser(<parsed UserId>)`, the only way for a procedure to reach
+ * user-owned tables (see `src/server/data/`).
  *
  * @see https://trpc.io/docs/procedures
  */
 export const protectedProcedure = t.procedure
 	.use(timingMiddleware)
 	.use(({ ctx, next }) => {
-		if (!ctx.session?.user?.id) {
+		const userId = userIdSchema.safeParse(ctx.session?.user?.id);
+		if (!ctx.session?.user || !userId.success) {
 			throw new TRPCError({ code: "UNAUTHORIZED" });
 		}
 		return next({
 			ctx: {
 				// infers the `session` as non-nullable
 				session: { ...ctx.session, user: ctx.session.user },
-				userData: forUser(ctx.session.user.id),
+				userData: forUser(userId.data),
 			},
 		});
 	});

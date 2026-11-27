@@ -28,3 +28,17 @@ export const registerSchema = z.object({
 	email: emailSchema,
 	password: passwordSchema,
 });
+
+/**
+ * The signed-in user's id (`users.id`), parsed from the session. Branded, so data functions
+ * (`forUser` in `src/server/data/`) accept only an id that went through this schema, not any
+ * `string`. Lives here because the id comes from auth and this file imports only zod, so
+ * `src/server/api/`, `src/server/data/` and tests can use it without pulling in next-auth or db.
+ */
+export const userIdSchema = z
+	.string()
+	.trim()
+	.min(1, { error: "Identyfikator użytkownika nie może być pusty." })
+	.brand<"UserId">();
+
+export type UserId = z.infer<typeof userIdSchema>;
